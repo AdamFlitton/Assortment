@@ -3,22 +3,37 @@ setwd("~/desktop/SL Practical")
 library(readxl)
 dat<-read_excel("AssortmentData_2013-2017.xls",sheet=3)
 
-##############Factorise categorical variable - note new variable for majority/minority males and females. No reason for 
-##############this other than simplicity. Let me know what you think.
+##############Factorise categorical variables
 dat$Condition<-as.factor(dat$Condition)
 dat$Sex<-as.factor(dat$Sex)
 dat$Year<-as.factor(dat$Year)
-dat$RatioMajMin<-ifelse(dat$PropF<=0.49,"min",ifelse(dat$PropF>=0.51,"maj","split"))
-dat$RatioMajMin<-as.factor(dat$RatioMajMin)
 dat$PropF<-as.factor(dat$PropF)
 dat$Priorknowledge<-as.factor(dat$Priorknowledge)
 dat$GroupIDforGLMM<-as.factor(dat$GroupIDforGLMM)
 levels(dat$Sex)<-c("Male","Female")
 levels(dat$Condition)<-c("Random","Assortment")
 
+##############Since we have differing proportions of females every time, could use below for simplicity?
+#dat$RatioMajMin<-ifelse(dat$PropF<=0.49,"min",ifelse(dat$PropF>=0.51,"maj","split"))
+#dat$RatioMajMin<-as.factor(dat$RatioMajMin)
+
 ##############Plot prep
-dodge<-position_dodge(width=0.75)
 library(ggplot2)
+dodge<-position_dodge(width=0.75)
+
+##############Violin plot of condition collapsed across years and sexes (use facet wrap to see year/sex)
+ggplot(dat,aes(x=Condition,y=Contributiontopotpence))+
+  geom_violin()+
+  geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
+  #facet_wrap(~Year)+
+  theme_classic()
+
+##############Violin plot of sex collapsed across years and conditions (use facet wrap to see year/sex)
+ggplot(dat,aes(x=Sex,y=Contributiontopotpence))+
+  geom_violin()+
+  geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
+  #facet_wrap(~Year)+
+  theme_classic()
 
 ##############Violin plot collapsed across years, interaction between sex and condition.
 ggplot(dat,aes(x=Condition,y=Contributiontopotpence,fill=Sex))+
@@ -40,7 +55,7 @@ t.test(dat$Contributiontopotpence~dat$Condition)
 t.test(dat$Contributiontopotpence~dat$Sex)
 
 ##############ANOVAs
-av<-aov(dat$Contributiontopotpence~dat$RatioMajMin)
+av<-aov(dat$Contributiontopotpence~dat$PropF)
 av<-aov(dat$Contributiontopotpence~dat$Condition*dat$Sex)
 summary(av)
 TukeyHSD(av)
@@ -87,6 +102,5 @@ summary(h2mod)
 AIC(fullmod)
 AIC(h2mod)
 #############LR test
-library(lmtest)
 lrtest(fullmod,h2mod)
 #############Sex ratio improves model fit.
