@@ -16,6 +16,9 @@ levels(dat$Condition)<-c("Random","Assortment")
 ##############Since we have differing proportions of females every time, could use below for simplicity?
 #dat$RatioMajMin<-ifelse(dat$PropF<=0.49,"min",ifelse(dat$PropF>=0.51,"maj","split"))
 #dat$RatioMajMin<-as.factor(dat$RatioMajMin)
+##############Or since so few mins, maybe:
+#dat$RatioMajMin<-ifelse(dat$PropF>=0.51,"maj","min")
+#dat$RatioMajMin<-as.factor(dat$RatioMajMin)
 
 ##############Plot prep
 library(ggplot2)
@@ -57,6 +60,7 @@ t.test(dat$Contributiontopotpence~dat$Sex)
 ##############ANOVAs
 av<-aov(dat$Contributiontopotpence~dat$PropF)
 av<-aov(dat$Contributiontopotpence~dat$Condition*dat$Sex)
+av<-aov(dat$Contributiontopotpence~dat$Condition*dat$PropF)
 summary(av)
 TukeyHSD(av)
 
@@ -66,41 +70,122 @@ library(lme4)
 #############Before running models, how much variation is attributable to years?
 icc1<-lmer(dat$Contributiontopotpence~(1|dat$Year))
 summary(icc1)
-#############5% of variation at level of year
+as.data.frame(VarCorr(icc1),comp="Variance")[1,4]/
+  (as.data.frame(VarCorr(icc1),comp="Variance")[1,4]+as.data.frame(VarCorr(icc1),comp="Variance")[2,4])
+#############4% of variation at level of year
+
 ############Just out of interest, how much variation between groups?
 icc2<-lmer(dat$Contributiontopotpence~(1|dat$GroupIDforGLMM))
 summary(icc2)
+as.data.frame(VarCorr(icc2),comp="Variance")[1,4]/
+  (as.data.frame(VarCorr(icc2),comp="Variance")[1,4]+as.data.frame(VarCorr(icc1),comp="Variance")[2,4])
 #############6% of variation at level of group
 
 #############Models
-#############Does an interaction between condition and sex help the model?
-#############Model with interaction
-fullmod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Condition*dat$Sex+
-              dat$Age+dat$Priorknowledge+dat$PropF+(1|dat$Year))
-summary(fullmod)
-#############Model without interaction
-h1mod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+(1|dat$Year))
-summary(h1mod)
-#############Comparison
-AIC(fullmod)
-AIC(h1mod)
-#############LR test
-library(lmtest)
-lrtest(fullmod,h1mod)
-#############Interaction improves model fit.
+#############Does the inclusion of sex ratio help the model?
+#############'Null' model containing all main effects but PropF.
+emptymod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+(1|dat$Year))
 
-#############Does sex ratio help the model?
 #############Model with sex ratio
-fullmod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Condition*dat$Sex+
-                dat$Age+dat$Priorknowledge+dat$PropF+(1|dat$Year))
-summary(fullmod)
-#############Model without sex ratio
-h2mod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Condition*dat$Sex+
-              dat$Age+dat$Priorknowledge+(1|dat$Year))
-summary(h2mod)
+sexratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+(1|dat$Year))
+
 #############Comparison
-AIC(fullmod)
-AIC(h2mod)
-#############LR test
-lrtest(fullmod,h2mod)
+AIC(emptymod)
+AIC(sexratiomod)
+library(lmtest)
+lrtest(emptymod,sexratiomod)
 #############Sex ratio improves model fit.
+
+#############Does an interaction between condition and sex help the model?
+#############sexratiomod is the  'null' model containing all main effects but no cond*sex
+#############Model with cond*sex added
+condsexmod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+
+                   dat$Condition*dat$Sex+(1|dat$Year))
+
+#############Comparison
+AIC(sexratiomod)
+AIC(condsexmod)
+lrtest(sexratiomod,condsexmod)
+#############Interaction improves fit.
+
+#############Does sex ratio*condition improve model fit?
+#############sexratiomod is the  'null' model containing all main effects but no cond*sex
+#############Model with cond*sexratio added
+condratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+
+                   dat$Condition*dat$PropF+(1|dat$Year))
+#############Won't converge - too few data points. See below:
+library(dplyr)
+View(dat%>%group_by(Condition,Sex,PropF,Year)%>%tally())
+
+#############We can stop here, or redo everything with a different propF variable.
+
+
+
+
+
+
+
+
+
+
+
+
+##############ANOVAs
+av<-aov(dat$Contributiontopotpence~dat$RatioMajMin)
+av<-aov(dat$Contributiontopotpence~dat$Condition*dat$Sex)
+av<-aov(dat$Contributiontopotpence~dat$Condition*dat$RatioMajMin)
+summary(av)
+TukeyHSD(av)
+
+#############GLMMs
+
+#############Does the inclusion of sex ratio help the model?
+#############'Null' model containing all main effects but PropF.
+emptymod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+(1|dat$Year))
+
+#############Model with sex ratio
+sexratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+(1|dat$Year))
+
+#############Comparison
+AIC(emptymod)
+AIC(sexratiomod)
+library(lmtest)
+lrtest(emptymod,sexratiomod)
+#############Sex ratio improves model fit.
+
+#############Does an interaction between condition and sex help the model?
+#############sexratiomod is the  'null' model containing all main effects but no cond*sex
+#############Model with cond*sex added
+condsexmod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+
+                   dat$Condition*dat$Sex+(1|dat$Year))
+
+#############Comparison
+AIC(sexratiomod)
+AIC(condsexmod)
+lrtest(sexratiomod,condsexmod)
+#############Interaction improves fit.
+
+#############Does sex ratio*condition improve model fit?
+#############sexratiomod is the  'null' model containing all main effects but no cond*sex
+#############Model with cond*sexratio added
+condratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+
+                     dat$Condition*dat$RatioMajMin+(1|dat$Year))
+
+#############Comparison
+AIC(sexratiomod)
+AIC(condratiomod)
+lrtest(sexratiomod,condratiomod)
+#############Interaction improves fit.
+
+
+condratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+
+                     dat$Condition*dat$RatioMajMin*dat$Sex+(1|dat$Year))
+
+
+#females that assort into majority female groups give the most?
+ggplot(dat)+
+  aes(x=Sex,y=Contributiontopotpence,fill=RatioMajMin)+
+  geom_violin()+
+  geom_point(position=position_jitterdodge())+
+  facet_wrap(~Condition)
+
