@@ -1,4 +1,4 @@
-##############Load in
+##############Load
 setwd("~/desktop/SL Practical")
 library(readxl)
 dat<-read_excel("AssortmentData_2013-2017.xls",sheet=3)
