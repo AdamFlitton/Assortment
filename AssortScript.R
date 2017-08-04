@@ -7,18 +7,9 @@ dat<-read_excel("AssortmentData_2013-2017.xls",sheet=3)
 dat$Condition<-as.factor(dat$Condition)
 dat$Sex<-as.factor(dat$Sex)
 dat$Year<-as.factor(dat$Year)
-dat$PropF<-as.factor(dat$PropF)
 dat$Priorknowledge<-as.factor(dat$Priorknowledge)
-dat$GroupIDforGLMM<-as.factor(dat$GroupIDforGLMM)
 levels(dat$Sex)<-c("Male","Female")
 levels(dat$Condition)<-c("Random","Assortment")
-
-##############Since we have differing proportions of females every time, could use below for simplicity?
-#dat$RatioMajMin<-ifelse(dat$PropF<=0.49,"min",ifelse(dat$PropF>=0.51,"maj","split"))
-#dat$RatioMajMin<-as.factor(dat$RatioMajMin)
-##############Or since so few mins, maybe:
-#dat$RatioMajMin<-ifelse(dat$PropF>=0.51,"maj","min")
-#dat$RatioMajMin<-as.factor(dat$RatioMajMin)
 
 ##############Plot prep
 library(ggplot2)
@@ -28,7 +19,7 @@ dodge<-position_dodge(width=0.75)
 ggplot(dat,aes(x=Condition,y=Contributiontopotpence))+
   geom_violin()+
   geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
-  #facet_wrap(~Year)+
+  facet_wrap(~Year)+
   theme_classic()
 
 ##############Violin plot of sex collapsed across years and conditions (use facet wrap to see year/sex)
@@ -42,7 +33,7 @@ ggplot(dat,aes(x=Sex,y=Contributiontopotpence))+
 ggplot(dat,aes(x=Condition,y=Contributiontopotpence,fill=Sex))+
   geom_violin(position=dodge)+
   geom_point(position=position_jitterdodge())+
-  #facet_wrap(~Year)+
+  facet_wrap(~Year)+
   theme_classic()
 
 ##############As above, but for all years (can make a violin plot here too, but the low number of males in 
@@ -56,6 +47,7 @@ ggplot(dat,aes(x=Condition,y=Contributiontopotpence,fill=Sex))+
 ##############Univariate tests
 t.test(dat$Contributiontopotpence~dat$Condition)
 t.test(dat$Contributiontopotpence~dat$Sex)
+t.test(dat$PropF~dat$Condition)
 
 ##############ANOVAs
 av<-aov(dat$Contributiontopotpence~dat$PropF)
@@ -67,125 +59,129 @@ TukeyHSD(av)
 #############GLMMs
 library(lme4)
 
-#############Before running models, how much variation is attributable to years?
+#############ICC for year
 icc1<-lmer(dat$Contributiontopotpence~(1|dat$Year))
 summary(icc1)
 as.data.frame(VarCorr(icc1),comp="Variance")[1,4]/
   (as.data.frame(VarCorr(icc1),comp="Variance")[1,4]+as.data.frame(VarCorr(icc1),comp="Variance")[2,4])
 #############4% of variation at level of year
 
-############Just out of interest, how much variation between groups?
-icc2<-lmer(dat$Contributiontopotpence~(1|dat$GroupIDforGLMM))
-summary(icc2)
-as.data.frame(VarCorr(icc2),comp="Variance")[1,4]/
-  (as.data.frame(VarCorr(icc2),comp="Variance")[1,4]+as.data.frame(VarCorr(icc1),comp="Variance")[2,4])
-#############6% of variation at level of group
+#############Without year as random intercept
+fullmodel<-lm(Contributiontopotpence~Condition+Sex+Age+Priorknowledge+Condition*Sex,dat)
+summary(fullmodel)
+AIC(fullmodel)
+#1413.03
+model2<-lm(Contributiontopotpence~Condition+Sex+Age+Priorknowledge,dat)
+AIC(model2)
+#1416.70
+model3<-lm(Contributiontopotpence~Sex+Age+Priorknowledge,dat)
+AIC(model3)
+#1414.72
+model4<-lm(Contributiontopotpence~Sex+Age,dat)
+AIC(model4)
+#1412.79
+model5<-lm(Contributiontopotpence~Sex,dat)
+AIC(model5)
+#1410.82
+model6<-lm(Contributiontopotpence~1,dat)
+AIC(model6)
+#1411.35
 
-#############Models
-#############Does the inclusion of sex ratio help the model?
-#############'Null' model containing all main effects but PropF.
-emptymod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+(1|dat$Year))
-
-#############Model with sex ratio
-sexratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+(1|dat$Year))
-
-#############Comparison
-AIC(emptymod)
-AIC(sexratiomod)
-library(lmtest)
-lrtest(emptymod,sexratiomod)
-#############Sex ratio improves model fit.
-
-#############Does an interaction between condition and sex help the model?
-#############sexratiomod is the  'null' model containing all main effects but no cond*sex
-#############Model with cond*sex added
-condsexmod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+
-                   dat$Condition*dat$Sex+(1|dat$Year))
-
-#############Comparison
-AIC(sexratiomod)
-AIC(condsexmod)
-lrtest(sexratiomod,condsexmod)
-#############Interaction improves fit.
-
-#############Does sex ratio*condition improve model fit?
-#############sexratiomod is the  'null' model containing all main effects but no cond*sex
-#############Model with cond*sexratio added
-condratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$PropF+
-                   dat$Condition*dat$PropF+(1|dat$Year))
-#############Won't converge - too few data points. See below:
-library(dplyr)
-View(dat%>%group_by(Condition,Sex,PropF,Year)%>%tally())
-
-#############We can stop here, or redo everything with a different propF variable.
-
-
-
+#############With year as random intercept
+fullmodel<-lmer(Contributiontopotpence~Condition+Sex+Age+Priorknowledge+Condition*Sex+(1|Year),dat)
+summary(fullmodel)
+AIC(fullmodel)
+#1384.19
+model2<-lmer(Contributiontopotpence~Condition+Sex+Age+Priorknowledge+(1|Year),dat)
+AIC(model2)
+#1394.19
+model3<-lmer(Contributiontopotpence~Sex+Age+Priorknowledge+(1|Year),dat)
+AIC(model3)
+#1398.52
+model4<-lmer(Contributiontopotpence~Sex+Age+(1|Year),dat)
+AIC(model4)
+#1402.09
+model5<-lmer(Contributiontopotpence~Sex+(1|Year),dat)
+AIC(model5)
+#1402.05
+model6<-lmer(Contributiontopotpence~(1|Year),dat)
+AIC(model6)
+#1407.44
+#Model below is simplest, and lowest AIC.
+fullmodelnoage<-lmer(Contributiontopotpence~Condition+Sex+Priorknowledge+Condition*Sex+(1|Year),dat)
+AIC(fullmodelnoage)
+#1384.19
 
 
+#############Sex ratio ideas
 
+graphdat<-aggregate(dat$Sex,
+                    by=list(cond=dat$Condition),
+                    FUN=function(x) c(mean=mean(x),sd=sd(x),n=length(x)))
+graphdat<-do.call(data.frame,graphdat)
+graphdat$se<-graphdat$x.sd/sqrt(graphdat$x.n)
+colnames(graphdat)<-c("cond","mean","sd","n","se")
+graphdat$cond<-as.factor(graphdat$cond)
 
+ggplot(graphdat,aes(x=cond,y=mean))+
+  geom_bar(position=position_dodge(),stat="identity",colour="black",size=0.3)+
+  geom_errorbar(aes(ymin=mean-se,ymax=mean+se),
+                width=0.2,
+                position=position_dodge(0.9))+
+  ylim(c(0,1))
 
+#Need to read this more - how about residuals? Is it the same as a partial regression/ Would it even help given
+#the boundary on the N of males you can have given the bias towards female N?
+res<-residuals(lmer(Contributiontopotpence~PropF*Condition+Condition+PropF+Priorknowledge+(1|Year),dat))
+restest<-lmer(res~Sex+(1|Year),dat)
 
+summary(restest)
 
+dat$res<-res
 
-
-##############ANOVAs
-av<-aov(dat$Contributiontopotpence~dat$RatioMajMin)
-av<-aov(dat$Contributiontopotpence~dat$Condition*dat$Sex)
-av<-aov(dat$Contributiontopotpence~dat$Condition*dat$RatioMajMin)
-summary(av)
-TukeyHSD(av)
-
-#############GLMMs
-
-#############Does the inclusion of sex ratio help the model?
-#############'Null' model containing all main effects but PropF.
-emptymod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+(1|dat$Year))
-
-#############Model with sex ratio
-sexratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+(1|dat$Year))
-
-#############Comparison
-AIC(emptymod)
-AIC(sexratiomod)
-library(lmtest)
-lrtest(emptymod,sexratiomod)
-#############Sex ratio improves model fit.
-
-#############Does an interaction between condition and sex help the model?
-#############sexratiomod is the  'null' model containing all main effects but no cond*sex
-#############Model with cond*sex added
-condsexmod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+
-                   dat$Condition*dat$Sex+(1|dat$Year))
-
-#############Comparison
-AIC(sexratiomod)
-AIC(condsexmod)
-lrtest(sexratiomod,condsexmod)
-#############Interaction improves fit.
-
-#############Does sex ratio*condition improve model fit?
-#############sexratiomod is the  'null' model containing all main effects but no cond*sex
-#############Model with cond*sexratio added
-condratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+
-                     dat$Condition*dat$RatioMajMin+(1|dat$Year))
-
-#############Comparison
-AIC(sexratiomod)
-AIC(condratiomod)
-lrtest(sexratiomod,condratiomod)
-#############Interaction improves fit.
-
-
-condratiomod<-lmer(dat$Contributiontopotpence~dat$Condition+dat$Sex+dat$Age+dat$Priorknowledge+dat$RatioMajMin+
-                     dat$Condition*dat$RatioMajMin*dat$Sex+(1|dat$Year))
-
-
-#females that assort into majority female groups give the most?
-ggplot(dat)+
-  aes(x=Sex,y=Contributiontopotpence,fill=RatioMajMin)+
+ggplot(dat,aes(x=Sex,y=res))+
   geom_violin()+
-  geom_point(position=position_jitterdodge())+
-  facet_wrap(~Condition)
+  geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
+  #facet_wrap(~Year)+
+  theme_classic()
 
+
+#############Testing sex ratio
+fullmodel<-lmer(Contributiontopotpence~Condition+PropF+Age+Priorknowledge+Condition*PropF+(1|Year),dat)
+summary(fullmodel)
+AIC(fullmodel)
+#1383.75
+
+model2<-lmer(Contributiontopotpence~Condition+PropF+Age+Priorknowledge+(1|Year),dat)
+AIC(model2)
+#1394.82
+
+model3<-lmer(Contributiontopotpence~PropF+Age+Priorknowledge+(1|Year),dat)
+AIC(model3)
+#1398.41
+
+model4<-lmer(Contributiontopotpence~PropF+Age+(1|Year),dat)
+AIC(model4)
+#1402.09
+
+model5<-lmer(Contributiontopotpence~PropF+(1|Year),dat)
+AIC(model5)
+#1402.16
+
+model6<-lmer(Contributiontopotpence~(1|Year),dat)
+AIC(model6)
+#1407.44
+
+#drop age
+fullmodelnoage<-lmer(Contributiontopotpence~Condition+PropF+Priorknowledge+Condition*PropF+(1|Year),dat)
+AIC(fullmodelnoage)
+
+
+#Predictors of assortation:
+model6<-lm(PropF~1,dat)
+model7<-lmer(PropF~(1|Year),dat)
+icc(model7)
+AIC(model7)
+model8<-lmer(PropF~Sex+(1|Year),dat)
+summary(model8)
+AIC(model8)
