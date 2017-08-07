@@ -13,36 +13,83 @@ levels(dat$Condition)<-c("Random","Assortment")
 
 ##############Plot prep
 library(ggplot2)
+library(dplyr)
 dodge<-position_dodge(width=0.75)
 
-##############Violin plot of condition collapsed across years and sexes (use facet wrap to see year/sex)
+##############Condition collapsed across year and sex.
+datforplot1<-dat %>% group_by(Condition) %>% summarise(avg=mean(Contributiontopotpence),std=sd
+                                                       (Contributiontopotpence),n=length(Contributiontopotpence))
+datforplot1<-data.frame(datforplot1)
+datforplot1$se<-datforplot1$std/(sqrt(datforplot1$n))
+datforplot1$Condition<-as.factor(datforplot1$Condition)
 ggplot(dat,aes(x=Condition,y=Contributiontopotpence))+
-  geom_violin()+
+  geom_violin(position=dodge)+
   geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
-  facet_wrap(~Year)+
-  theme_classic()
+  geom_point(aes(y=avg),data=datforplot1)+
+  geom_errorbar(aes(y=avg,ymin=avg-se,ymax=avg+se),data=datforplot1)+
+  ylab("Contribution to Pot (Pence)")+
+  theme(panel.border=element_blank(),panel.background=element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.title=element_text(size=14),axis.text=element_text(size=12),
+        strip.background=element_blank(),strip.text=element_text(size=12),
+        legend.text=element_text(size=12))
 
-##############Violin plot of sex collapsed across years and conditions (use facet wrap to see year/sex)
-ggplot(dat,aes(x=Sex,y=Contributiontopotpence))+
-  geom_violin()+
-  geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
-  #facet_wrap(~Year)+
-  theme_classic()
-
-##############Violin plot collapsed across years, interaction between sex and condition.
+##############Condition by sex interaction collapsed across years.
+datforplot2<-dat %>% group_by(Condition,Sex) %>% summarise(avg=mean(Contributiontopotpence),std=sd
+                                                           (Contributiontopotpence),n=length(Contributiontopotpence))
+datforplot2<-data.frame(datforplot2)
+datforplot2$se<-datforplot2$std/(sqrt(datforplot2$n))
+datforplot2$Condition<-as.factor(datforplot2$Condition)
+datforplot2$Sex<-as.factor(datforplot2$Sex)
 ggplot(dat,aes(x=Condition,y=Contributiontopotpence,fill=Sex))+
   geom_violin(position=dodge)+
   geom_point(position=position_jitterdodge())+
-  facet_wrap(~Year)+
-  theme_classic()
+  geom_errorbar(aes(y=avg,ymin=avg-se,ymax=avg+se),position=dodge,data=datforplot2)+
+  ylab("Contribution to Pot (Pence)")+
+  theme(panel.border=element_blank(),panel.background=element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.title=element_text(size=14),axis.text=element_text(size=12),
+        strip.background=element_blank(),strip.text=element_text(size=12),
+        legend.text=element_text(size=12))
 
-##############As above, but for all years (can make a violin plot here too, but the low number of males in 
-##############2014 means that I cannot generate a violin for them, so I've left it as a dotplot)
+##############Condition effect for each year collapsed across sexes.
+datforplot3<-dat %>% group_by(Condition,Year) %>% summarise(avg=mean(Contributiontopotpence),std=sd
+                                                            (Contributiontopotpence),n=length(Contributiontopotpence))
+datforplot3<-data.frame(datforplot3)
+datforplot3$se<-datforplot3$std/(sqrt(datforplot3$n))
+datforplot3$Condition<-as.factor(datforplot3$Condition)
+datforplot3$Year<-as.factor(datforplot3$Year)
+ggplot(dat,aes(x=Condition,y=Contributiontopotpence))+
+  geom_violin(position=dodge)+
+  geom_dotplot(binaxis = "y", stackdir = "center",dotsize=0.5)+
+  geom_point(aes(y=avg),data=datforplot3)+
+  geom_errorbar(aes(y=avg,ymin=avg-se,ymax=avg+se),data=datforplot3)+
+  facet_wrap(~Year)+
+  ylab("Contribution to Pot (Pence)")+
+  theme(panel.border=element_blank(),panel.background=element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.title=element_text(size=14),axis.text=element_text(size=12),
+        strip.background=element_blank(),strip.text=element_text(size=12),
+        legend.text=element_text(size=12))
+
+
+##############interaction between condition and sex for each year.
+datforplot4<-dat %>% group_by(Condition,Sex,Year) %>% summarise(avg=mean(Contributiontopotpence),std=sd
+                                                                (Contributiontopotpence),n=length(Contributiontopotpence))
+datforplot4<-data.frame(datforplot4)
+datforplot4$se<-datforplot4$std/(sqrt(datforplot4$n))
+datforplot4$Condition<-as.factor(datforplot4$Condition)
+datforplot4$Sex<-as.factor(datforplot4$Sex)
 ggplot(dat,aes(x=Condition,y=Contributiontopotpence,fill=Sex))+
-  geom_point(aes(color=Sex),size=2,position=position_jitterdodge())+
+  geom_violin(position=dodge)+
+  geom_point(position=position_jitterdodge())+
+  geom_errorbar(aes(y=avg,ymin=avg-se,ymax=avg+se),position=dodge,data=datforplot4)+
   facet_wrap(~Year)+
-  theme_classic()
-
+  theme(panel.border=element_blank(),panel.background=element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.title=element_text(size=14),axis.text=element_text(size=12),
+        strip.background=element_blank(),strip.text=element_text(size=12),
+        legend.text=element_text(size=12))
 
 ##############Univariate tests
 t.test(dat$Contributiontopotpence~dat$Condition)
@@ -112,6 +159,8 @@ fullmodelnoage<-lmer(Contributiontopotpence~Condition+Sex+Priorknowledge+Conditi
 AIC(fullmodelnoage)
 #1384.19
 
+icc(fullmodelnoage)
+summary(fullmodelnoage)
 
 #############Sex ratio ideas
 
@@ -177,7 +226,7 @@ fullmodelnoage<-lmer(Contributiontopotpence~Condition+PropF+Priorknowledge+Condi
 AIC(fullmodelnoage)
 
 
-#Predictors of assortation:
+#Predictors of assortment:
 model6<-lm(PropF~1,dat)
 model7<-lmer(PropF~(1|Year),dat)
 icc(model7)
@@ -185,3 +234,4 @@ AIC(model7)
 model8<-lmer(PropF~Sex+(1|Year),dat)
 summary(model8)
 AIC(model8)
+
